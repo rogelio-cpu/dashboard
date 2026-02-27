@@ -19,6 +19,7 @@ let history = [];
 app.post('/api/data', (req, res) => {
     const { api_key, flow_up, flow_down } = req.body;
 
+    // Vérification de sécurité simple
     if (api_key !== 'AquaGuard_Secret_Key_2026') {
         return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -39,23 +40,25 @@ app.post('/api/data', (req, res) => {
     };
 
     history.push(newData);
+    // On garde uniquement les 50 derniers pour ne pas saturer la mémoire
     if (history.length > 50) history.shift();
 
     console.log(`Données reçues: In:${flow_up} Out:${flow_down} Loss:${loss}`);
     res.status(200).json({ message: 'Success', data: newData });
 });
 
-// API pour le Dashboard
+// API pour le Dashboard (Frontend)
 app.get('/api/history', (req, res) => {
     res.json(history);
 });
 
 // Servir les fichiers statiques du build de Vite
+// Assurez-vous que le dossier se nomme bien 'dist' après votre build
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// --- LA CORRECTION EST ICI ---
-// On utilise (.*) au lieu de '*' pour éviter l'erreur PathError sur Render
-app.get('(.*)', (req, res) => {
+// Redirection vers index.html pour le routage SPA (Single Page Application)
+// CORRECTION : Utilisation d'un paramètre nommé ':path*' pour compatibilité Express 5+
+app.get('/:path*', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
