@@ -12,14 +12,13 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Stockage temporaire (In-memory) - Pour une production réelle, utilisez une base de données.
+// Stockage temporaire (In-memory)
 let history = [];
 
 // API pour l'ESP32
 app.post('/api/data', (req, res) => {
     const { api_key, flow_up, flow_down } = req.body;
 
-    // Vérification de sécurité simple
     if (api_key !== 'AquaGuard_Secret_Key_2026') {
         return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -40,14 +39,13 @@ app.post('/api/data', (req, res) => {
     };
 
     history.push(newData);
-    // On garde uniquement les 50 derniers pour ne pas saturer la mémoire
     if (history.length > 50) history.shift();
 
     console.log(`Données reçues: In:${flow_up} Out:${flow_down} Loss:${loss}`);
     res.status(200).json({ message: 'Success', data: newData });
 });
 
-// API pour le Dashboard (Frontend)
+// API pour le Dashboard
 app.get('/api/history', (req, res) => {
     res.json(history);
 });
@@ -55,8 +53,9 @@ app.get('/api/history', (req, res) => {
 // Servir les fichiers statiques du build de Vite
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Redirection vers index.html pour le routage SPA
-app.get('*', (req, res) => {
+// --- LA CORRECTION EST ICI ---
+// On utilise (.*) au lieu de '*' pour éviter l'erreur PathError sur Render
+app.get('(.*)', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
