@@ -44,14 +44,14 @@ function App() {
             <KPI
               label="Flux Entrant"
               value={current?.flow_up || 0}
-              unit="ml/min"
+              unit="L/min"
               icon={<TrendingUp className="w-5 h-5" />}
               status="normal"
             />
             <KPI
               label="Flux Sortant"
               value={current?.flow_down || 0}
-              unit="ml/min"
+              unit="L/min"
               icon={<Activity className="w-5 h-5" />}
               status={current?.status}
             />
