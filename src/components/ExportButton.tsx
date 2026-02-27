@@ -7,7 +7,7 @@ interface ExportButtonProps {
 
 export const ExportButton = ({ data }: ExportButtonProps) => {
     const exportToCSV = () => {
-        const headers = ['Timestamp', 'Flow Up (L/min)', 'Flow Down (L/min)', 'Loss (L/min)', 'Status'];
+        const headers = ['Timestamp', 'Flow Up (ml/min)', 'Flow Down (ml/min)', 'Loss (ml/min)', 'Status'];
         const csvRows = [
             headers.join(','),
             ...data.map(row => [
