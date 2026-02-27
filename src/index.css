@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --color-midnight: #0a0e1a;
+  --color-midnight-light: #1a202c;
+  --color-glass: rgba(255, 255, 255, 0.1);
+  --color-glass-dark: rgba(0, 0, 0, 0.2);
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+:root {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+}
+
+.light {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+}
+
+@layer base {
+  body {
+    @apply bg-midnight text-slate-100 transition-colors duration-300;
+  }
+}
+
+.glass-card {
+  @apply bg-white/10 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl;
+}
+
+.dark .glass-card {
+  @apply bg-black/20 backdrop-blur-md border border-white/10 shadow-2xl;
+}
+
+.status-dot {
+  @apply w-3 h-3 rounded-full relative;
+}
+
+.status-dot::after {
+  content: '';
+  @apply absolute inset-0 rounded-full animate-ping opacity-75;
+}
+
+.dot-green {
+  @apply bg-emerald-500;
+}
+
+.dot-green::after {
+  @apply bg-emerald-500;
+}
+
+.dot-red {
+  @apply bg-rose-500;
+}
+
+.dot-red::after {
+  @apply bg-rose-500;
+}
+
+.dot-orange {
+  @apply bg-amber-500;
+}
+
+.dot-orange::after {
+  @apply bg-amber-500;
+}
