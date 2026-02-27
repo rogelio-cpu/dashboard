@@ -44,21 +44,21 @@ function App() {
             <KPI
               label="Flux Entrant"
               value={current?.flow_up || 0}
-              unit="L/min"
+              unit="ml/min"
               icon={<TrendingUp className="w-5 h-5" />}
               status="normal"
             />
             <KPI
               label="Flux Sortant"
               value={current?.flow_down || 0}
-              unit="L/min"
+              unit="ml/min"
               icon={<Activity className="w-5 h-5" />}
               status={current?.status}
             />
             <KPI
               label="Volume Perdu (Session)"
               value={totalLoss}
-              unit="L"
+              unit="ml"
               icon={<ShieldAlert className="w-5 h-5" />}
               status={+totalLoss > 5 ? 'critical' : (+totalLoss > 2 ? 'warning' : 'normal')}
             />
