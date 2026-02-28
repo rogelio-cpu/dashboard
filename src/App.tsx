@@ -87,7 +87,7 @@ function App() {
                   <h4 className="text-xl font-bold dark:text-white">Statut du Système</h4>
                   <p className="text-slate-500 mt-1">
                     {current?.status === 'critical' ? 'Fuite majeure détectée !' :
-                      current?.status === 'warning' ? 'Débit instable détecté' : 'Fonctionnement nominal'}
+                      current?.status === 'warning' ? 'Fuite légère détectée !' : 'Fonctionnement nominal'}
                   </p>
                 </div>
               </div>

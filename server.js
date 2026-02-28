@@ -32,7 +32,8 @@ app.post('/api/data', (req, res) => {
     if (loss < 0) loss = 0; // Sécurité : pas de fuite négative
 
     // Détermination du statut (basé sur le débit en L/min)
-    const status = loss > 0.8 ? 'critical' : (loss > 0.3 ? 'warning' : 'normal');
+    // HAUTE SENSIBILITÉ : 0.5 L/min = Majeure, 0.1 L/min = Légère
+    const status = loss > 0.5 ? 'critical' : (loss > 0.1 ? 'warning' : 'normal');
 
     // Calcul du volume perdu EN CETTE SECONDE (ml)
     // Formule: (L/min * 1000) / 60 seconds
