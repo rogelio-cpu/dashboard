@@ -27,21 +27,29 @@ app.post('/api/data', (req, res) => {
         return res.status(400).json({ error: 'Missing flow data' });
     }
 
-    const loss = +(flow_up - flow_down).toFixed(2);
+    // Calcul de la perte brute en L/min
+    let loss = +(flow_up - flow_down).toFixed(2);
+    if (loss < 0) loss = 0; // Sécurité : pas de fuite négative
+
+    // Détermination du statut (basé sur le débit en L/min)
     const status = loss > 0.8 ? 'critical' : (loss > 0.3 ? 'warning' : 'normal');
+
+    // Calcul du volume perdu EN CETTE SECONDE (ml)
+    // Formule: (L/min * 1000) / 60 seconds
+    const lossPerSecond = status === 'normal' ? 0 : (loss * 1000) / 60;
 
     const newData = {
         timestamp: new Date().toLocaleTimeString(),
-        flow_up,
-        flow_down,
-        loss,
+        flow_up: +(flow_up * 1000).toFixed(0),   // ml/min
+        flow_down: +(flow_down * 1000).toFixed(0), // ml/min
+        loss: +lossPerSecond.toFixed(1),         // ml perdu en 1 seconde
         status,
     };
 
     history.push(newData);
     if (history.length > 50) history.shift();
 
-    console.log(`Données reçues: In:${flow_up} Out:${flow_down} Loss:${loss}`);
+    console.log(`Données reçues: In:${flow_up} Out:${flow_down} Loss:${lossMl}ml/min`);
     res.status(200).json({ message: 'Success', data: newData });
 });
 

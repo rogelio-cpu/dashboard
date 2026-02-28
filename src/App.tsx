@@ -4,6 +4,7 @@ import { useDashboardData } from './hooks/useDashboardData'
 import { KPI } from './components/UI'
 import { RealTimeChart, LossChart } from './components/Charts'
 import { ExportButton } from './components/ExportButton'
+import { formatFlow, formatVolume } from './utils/formatters'
 
 import { HistoryTable } from './components/HistoryTable'
 
@@ -11,8 +12,10 @@ function App() {
   const [darkMode, setDarkMode] = useState(true)
   const { data, current } = useDashboardData()
 
-  const totalLoss = data.reduce((acc, curr) => acc + curr.loss, 0).toFixed(2)
   const efficiency = current ? ((current.flow_down / current.flow_up) * 100).toFixed(1) : '100'
+  const flowUpFmt = formatFlow(current?.flow_up || 0)
+  const flowDownFmt = formatFlow(current?.flow_down || 0)
+  const lossFmt = formatVolume(current?.loss || 0)
 
   return (
     <div className={darkMode ? 'dark' : ''}>
@@ -43,24 +46,24 @@ function App() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <KPI
               label="Flux Entrant"
-              value={current?.flow_up || 0}
-              unit="L/min"
+              value={flowUpFmt.value}
+              unit={flowUpFmt.unit}
               icon={<TrendingUp className="w-5 h-5" />}
               status="normal"
             />
             <KPI
               label="Flux Sortant"
-              value={current?.flow_down || 0}
-              unit="L/min"
+              value={flowDownFmt.value}
+              unit={flowDownFmt.unit}
               icon={<Activity className="w-5 h-5" />}
               status={current?.status}
             />
             <KPI
-              label="Volume Perdu (Session)"
-              value={totalLoss}
-              unit="ml"
+              label="Perte en Temps Réel"
+              value={lossFmt.value}
+              unit={lossFmt.unit}
               icon={<ShieldAlert className="w-5 h-5" />}
-              status={+totalLoss > 5 ? 'critical' : (+totalLoss > 2 ? 'warning' : 'normal')}
+              status={current?.status}
             />
             <KPI
               label="Efficacité"

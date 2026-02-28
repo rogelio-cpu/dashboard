@@ -1,5 +1,6 @@
 import { Download } from 'lucide-react';
 import type { DashboardData } from '../hooks/useDashboardData';
+import { formatFlow, formatVolume } from '../utils/formatters';
 
 interface ExportButtonProps {
     data: DashboardData[];
@@ -7,16 +8,21 @@ interface ExportButtonProps {
 
 export const ExportButton = ({ data }: ExportButtonProps) => {
     const exportToCSV = () => {
-        const headers = ['Timestamp', 'Flow Up (ml/min)', 'Flow Down (ml/min)', 'Loss (ml/min)', 'Status'];
+        const headers = ['Timestamp', 'Flow Up', 'Flow Down', 'Loss', 'Status'];
         const csvRows = [
             headers.join(','),
-            ...data.map(row => [
-                row.timestamp,
-                row.flow_up,
-                row.flow_down,
-                row.loss,
-                row.status
-            ].join(','))
+            ...data.map(row => {
+                const flowUp = formatFlow(row.flow_up);
+                const flowDown = formatFlow(row.flow_down);
+                const loss = formatVolume(row.loss);
+                return [
+                    row.timestamp,
+                    `${flowUp.value} ${flowUp.unit}`,
+                    `${flowDown.value} ${flowDown.unit}`,
+                    `${loss.value} ${loss.unit}`,
+                    row.status
+                ].join(',');
+            })
         ];
 
         const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });

@@ -2,6 +2,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card } from './UI';
 import type { DashboardData } from '../hooks/useDashboardData';
 import { useState } from 'react';
+import { formatFlow, formatVolume } from '../utils/formatters';
 
 interface ChartProps {
     data: DashboardData[];
@@ -20,8 +21,8 @@ export const RealTimeChart = ({ data }: ChartProps) => {
                             key={p}
                             onClick={() => setPeriod(p)}
                             className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${period === p
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                ? 'bg-blue-600 text-white shadow-md'
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                                 }`}
                         >
                             {p.toUpperCase()}
@@ -45,10 +46,15 @@ export const RealTimeChart = ({ data }: ChartProps) => {
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
                         <XAxis dataKey="timestamp" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} unit=" L" />
+                        <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} unit=" ml/m" />
                         <Tooltip
                             contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#f8fafc' }}
                             itemStyle={{ fontSize: '12px' }}
+                            formatter={(value: number | undefined) => {
+                                if (value === undefined) return ['', ''];
+                                const fmt = formatFlow(value);
+                                return [`${fmt.value} ${fmt.unit}`, ''];
+                            }}
                         />
                         <Area type="monotone" dataKey="flow_up" stroke="#3b82f6" fillOpacity={1} fill="url(#colorUp)" name="Entrée" />
                         <Area type="monotone" dataKey="flow_down" stroke="#10b981" fillOpacity={1} fill="url(#colorDown)" name="Sortie" />
@@ -71,6 +77,11 @@ export const LossChart = ({ data }: ChartProps) => {
                         <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                         <Tooltip
                             contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#f8fafc' }}
+                            formatter={(value: number | undefined) => {
+                                if (value === undefined) return ['', 'Perte'];
+                                const fmt = formatVolume(value);
+                                return [`${fmt.value} ${fmt.unit}`, 'Perte'];
+                            }}
                         />
                         <Line type="monotone" dataKey="loss" stroke="#f43f5e" strokeWidth={2} dot={false} name="Perte" />
                     </LineChart>
