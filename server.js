@@ -50,7 +50,7 @@ app.post('/api/data', (req, res) => {
     history.push(newData);
     if (history.length > 50) history.shift();
 
-    console.log(`Données reçues: In:${flow_up} Out:${flow_down} Loss:${lossMl}ml/min`);
+    console.log(`Données reçues: In:${flow_up} Out:${flow_down} Loss:${newData.loss}ml`);
     res.status(200).json({ message: 'Success', data: newData });
 });
 

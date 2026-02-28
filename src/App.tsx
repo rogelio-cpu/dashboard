@@ -80,14 +80,27 @@ function App() {
             <div className="flex flex-col gap-6">
               <LossChart data={data} />
               <div className="glass-card p-6 flex-1 flex flex-col justify-center items-center text-center gap-4">
-                <div className={`p-4 rounded-full ${current?.status === 'critical' ? 'bg-rose-500/20 animate-pulse' : 'bg-emerald-500/20'}`}>
-                  <ShieldAlert className={current?.status === 'critical' ? 'text-rose-500' : 'text-emerald-500'} size={48} />
+                <div className={`p-4 rounded-full transition-all duration-500 ${current?.status === 'critical'
+                  ? 'bg-rose-500/20 animate-pulse'
+                  : current?.status === 'warning'
+                    ? 'bg-amber-500/20 animate-bounce-subtle'
+                    : 'bg-emerald-500/20'
+                  }`}>
+                  <ShieldAlert
+                    className={current?.status === 'critical'
+                      ? 'text-rose-500'
+                      : current?.status === 'warning'
+                        ? 'text-amber-500'
+                        : 'text-emerald-500'
+                    }
+                    size={48}
+                  />
                 </div>
                 <div>
                   <h4 className="text-xl font-bold dark:text-white">Statut du Système</h4>
-                  <p className="text-slate-500 mt-1">
+                  <p className="text-slate-500 mt-1 font-medium">
                     {current?.status === 'critical' ? 'Fuite majeure détectée !' :
-                      current?.status === 'warning' ? 'Fuite légère détectée !' : 'Fonctionnement nominal'}
+                      current?.status === 'warning' ? 'Fuite mineure détectée !' : 'Nominale'}
                   </p>
                 </div>
               </div>

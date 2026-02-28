@@ -7,6 +7,19 @@
   --color-glass-dark: rgba(0, 0, 0, 0.2);
 
   --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-bounce-subtle: bounce-subtle 2s ease-in-out infinite;
+
+  @keyframes bounce-subtle {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-4px);
+    }
+  }
 }
 
 :root {
@@ -58,10 +71,10 @@
   @apply bg-rose-500;
 }
 
-.dot-orange {
-  @apply bg-amber-500;
+.dot-yellow {
+  @apply bg-yellow-400;
 }
 
-.dot-orange::after {
-  @apply bg-amber-500;
+.dot-yellow::after {
+  @apply bg-yellow-400;
 }

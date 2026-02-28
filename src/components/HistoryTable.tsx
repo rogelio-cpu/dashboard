@@ -40,7 +40,10 @@ export const HistoryTable = ({ data }: HistoryTableProps) => {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             <StatusDot status={row.status} />
-                                            <span className="text-xs capitalize dark:text-slate-500">{row.status}</span>
+                                            <span className="text-xs font-medium dark:text-slate-500">
+                                                {row.status === 'critical' ? 'Fuite Majeure' :
+                                                    row.status === 'warning' ? 'Fuite Mineure' : 'Nominale'}
+                                            </span>
                                         </div>
                                     </td>
                                 </tr>

@@ -24,7 +24,7 @@ interface StatusDotProps {
 export const StatusDot = ({ status }: StatusDotProps) => {
     const colors = {
         normal: 'dot-green',
-        warning: 'dot-orange',
+        warning: 'dot-yellow',
         critical: 'dot-red'
     };
     return <div className={cn("status-dot", colors[status])} />;
