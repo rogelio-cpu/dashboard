@@ -1,0 +1,167 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{titling}
+\usepackage{lipsum} % Pour le texte factice, à retirer ensuite
+
+% Définition des couleurs
+\definecolor{bleuprincipal}{RGB}{0, 102, 204}
+\definecolor{grisclair}{RGB}{245, 245, 245}
+\definecolor{bleufonce}{RGB}{0, 51, 102}
+\definecolor{vertaccent}{RGB}{0, 153, 51}
+
+% Configuration de la géométrie de la page
+\geometry{margin=2.5cm}
+
+% Suppression de l'indentation des paragraphes
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% Personnalisation des sections avec couleurs
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{bleuprincipal}}
+  {\thesection}{1em}{}
+
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{bleufonce}}
+  {\thesubsection}{1em}{}
+
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries\color{vertaccent}}
+  {\thesubsubsection}{1em}{}
+
+% Personnalisation de la table des matières
+\usepackage[titles]{tocloft}
+\renewcommand{\cftsecfont}{\color{bleuprincipal}}
+\renewcommand{\cftsubsecfont}{\color{bleufonce}}
+\renewcommand{\cftsecpagefont}{\color{bleuprincipal}}
+\renewcommand{\cftsubsecpagefont}{\color{bleufonce}}
+
+% Configuration des liens hypertextes
+\hypersetup{
+    colorlinks=true,
+    linkcolor=bleuprincipal,
+    urlcolor=vertaccent,
+    citecolor=bleufonce
+}
+
+% En-têtes et pieds de page personnalisés
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{bleufonce}{\leftmark}}
+\fancyhead[R]{\textcolor{bleufonce}{\thepage}}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{bleuprincipal}\leaders\hrule height \headrulewidth\hfill}}
+
+% Page de garde personnalisée
+\renewcommand{\maketitle}{
+  \begin{titlepage}
+    \centering
+    \vspace*{\fill}
+    
+    {\Huge\bfseries\color{bleuprincipal} Rapport Technique du Système AquaGuard\par}
+    \vspace{0.5cm}
+    {\Large\bfseries\color{bleufonce} Détection et Analyse des Fuites d'Eau en Temps Réel\par}
+    \vspace{2cm}
+    {\large\color{gray} Version 1.6\par}
+    \vspace{0.5cm}
+    {\large\color{gray} \today\par}
+    
+    \vspace*{\fill}
+  \end{titlepage}
+}
+
+% Suppression du titre automatique
+\title{}
+\author{}
+\date{}
+
+\begin{document}
+
+% Page de garde
+\maketitle
+
+% Table des matières avec couleurs
+\tableofcontents
+\thispagestyle{empty}
+\newpage
+
+% Première page avec style personnalisé
+\pagestyle{fancy}
+\setcounter{page}{1}
+
+\section{Introduction}
+AquaGuard est un système de surveillance métrologique conçu pour détecter les fuites d'eau avec une \textcolor{vertaccent}{précision optimale}. Il s'appuie sur une architecture distribuée comprenant un nœud IoT (Edge), un serveur de traitement backend (Node.js/Express) et une interface de visualisation en temps réel (Dashboard React).
+
+\section{Architecture Matérielle et Acquisition}
+
+\subsection{Composants}
+Le nœud d'acquisition est articulé autour d'un microcontrôleur \textbf{\textcolor{bleufonce}{ESP32}}. La mesure est assurée par deux débitmètres à effet Hall (type YF-S201) positionnés en amont et en aval du réseau à surveiller.
+
+\subsection{Acquisition des Données (Edge Computing)}
+Le calcul du débit s'effectue par interruption (comptage d'impulsions). La formule de conversion intégrée dans le firmware est :
+\begin{equation}
+\boxed{Q \text{ (L/min)} = \frac{N_{\text{impulsions}}}{K} \times 60}
+\end{equation}
+Où $K = 450.0$ est la constante d'étalonnage. Les débits amont ($Q_{\text{in}}$) et aval ($Q_{\text{out}}$) sont mesurés chaque seconde et transmis au serveur via une requête HTTP POST sécurisée sur réseau Wi-Fi.
+
+\section{Logique de Traitement et Filtrage (Backend)}
+Afin de pallier l'imprécision inhérente aux capteurs (bruit de mesure) et statuer avec certitude sur la nature d'une fuite, le serveur applique un algorithme de traitement en plusieurs étapes.
+
+\subsection{Calcul de l'Écart Différentiel}
+À la réception des données en L/min, le système calcule l'écart différentiel brut et le convertit en ml/min :
+\begin{equation}
+\Delta Q \text{ (ml/min)} = (Q_{\text{in}} - Q_{\text{out}}) \times 1000
+\end{equation}
+Toute valeur négative est corrigée à $0$ par sécurité (le débit amont ne pouvant physiquement pas être inférieur au débit aval dans un circuit étanche).
+
+\subsection{Filtrage et Seuils de Détection}
+Pour éviter les faux positifs causés par les fluctuations hydrodynamiques (zone de silence), la règle métier suivante est strictement appliquée :
+
+\textcolor{vertaccent}{\textbf{État Normal :}} Si $\Delta Q \le 300 \text{ ml/min}$. L'imprécision est gommée en forçant $\Delta Q = 0$ et le volume cumulé est remis à zéro.
+
+\textcolor{bleufonce}{\textbf{Fuite Mineure :}} Si $300 < \Delta Q \le 800 \text{ ml/min}$.
+
+\textcolor{bleuprincipal}{\textbf{Fuite Critique :}} Si $\Delta Q > 800 \text{ ml/min}$.
+
+\subsection{Intégration Temporelle (Calcul du Volume)}
+Le volume d'eau n'est pas une valeur statique mais le résultat de l'intégration mathématique du débit de fuite sur la durée de l'anomalie. Le serveur mémorise l'horodatage de la dernière trame ($t_{\text{prev}}$) et calcule la durée écoulée $\Delta t$ s'appliquant sur l'échantillon actuel :
+\begin{equation}
+\Delta t \text{ (s)} = t_{\text{actuel}} - t_{\text{prev}}
+\end{equation}
+Le volume cumulé perdu $V_{\text{perdu}}$ est incrémenté dynamiquement :
+\begin{equation}
+\boxed{V_{\text{perdu}} \text{ (ml)} = V_{\text{précédent}} + \frac{\Delta Q \times \Delta t}{60}}
+\end{equation}
+À titre illustratif, une fuite différentielle constante de $400 \text{ ml/min}$ durant $30 \text{ secondes}$ produit mathématiquement une accumulation de $200 \text{ ml}$.
+
+\begin{table}[h]
+\centering
+\caption{\textcolor{bleuprincipal}{Récapitulatif des seuils de détection}}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Seuil (ml/min)} & \textbf{Classification} & \textbf{Action} \\
+\midrule
+$\leq 300$ & Normal & Reset volume \\
+$301 - 800$ & Fuite mineure & Surveillance \\
+$> 800$ & Fuite critique & Alerte immédiate \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Interface et Restitution (Frontend)}
+Le Dashboard récupère l'historique traité par le serveur de façon cyclique. Les volumes et les débits sont affichés sous format numérique, vectoriel (graphiques \textsf{Recharts}) et tabulaire avec application automatique d'un formatage d'unités (bascule automatique en Litres si la valeur excède $1000 \text{ ml}$).
+
+\section{Conclusion}
+Par l'utilisation croisée du calcul d'intégration temporelle et de seuils de silence stricts, le système \textcolor{bleuprincipal}{AquaGuard} s'assure d'une haute fiabilité prédictive tout en minimisant les fausses alertes liées aux bruits de mesure conventionnels.
+
+\end{document}

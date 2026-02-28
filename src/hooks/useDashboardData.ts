@@ -15,6 +15,9 @@ export const useDashboardData = () => {
     const [current, setCurrent] = useState<DashboardData | null>(null);
 
     useEffect(() => {
+        let lastTime = Date.now();
+        let cumulativeVolume = 0;
+
         const fetchData = async () => {
             try {
                 const response = await fetch(API_URL);
@@ -29,20 +32,39 @@ export const useDashboardData = () => {
                 throw new Error('API not available, using simulation');
             } catch (error) {
                 // FALLBACK TO SIMULATION if API fails
-                const flow_up = +(10 + Math.random() * 5).toFixed(2);
-                const isLeaking = Math.random() > 0.9;
-                const flow_down = isLeaking
-                    ? +(flow_up - (1 + Math.random() * 2)).toFixed(2)
-                    : +(flow_up - (Math.random() * 0.2)).toFixed(2);
+                const now = Date.now();
+                const durationSeconds = (now - lastTime) / 1000;
+                lastTime = now;
 
-                const loss = +(flow_up - flow_down).toFixed(2);
-                const status = loss > 0.8 ? 'critical' : (loss > 0.3 ? 'warning' : 'normal');
+                const flow_up_L_min = 10 + Math.random() * 5;
+                const isLeaking = Math.random() > 0.9;
+                const flow_down_L_min = isLeaking
+                    ? flow_up_L_min - (0.35 + Math.random() * 0.6)
+                    : flow_up_L_min - (Math.random() * 0.2);
+
+                let loss_ml_min = (flow_up_L_min - flow_down_L_min) * 1000;
+                if (loss_ml_min < 0) loss_ml_min = 0;
+
+                let status: 'normal' | 'warning' | 'critical' = 'normal';
+                if (loss_ml_min <= 300) {
+                    loss_ml_min = 0;
+                    status = 'normal';
+                    cumulativeVolume = 0;
+                } else if (loss_ml_min <= 800) {
+                    status = 'warning';
+                } else {
+                    status = 'critical';
+                }
+
+                if (status !== 'normal') {
+                    cumulativeVolume += (loss_ml_min * durationSeconds) / 60;
+                }
 
                 const newDataPoint: DashboardData = {
                     timestamp: new Date().toLocaleTimeString(),
-                    flow_up,
-                    flow_down,
-                    loss,
+                    flow_up: +(flow_up_L_min * 1000).toFixed(0),
+                    flow_down: +(flow_down_L_min * 1000).toFixed(0),
+                    loss: +cumulativeVolume.toFixed(1),
                     status,
                 };
 

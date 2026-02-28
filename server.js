@@ -14,6 +14,8 @@ app.use(express.json());
 
 // Stockage temporaire (In-memory)
 let history = [];
+let ongoingLeakVolume = 0;
+let lastDataTime = null;
 
 // 1. API pour l'ESP32
 app.post('/api/data', (req, res) => {
@@ -27,30 +29,46 @@ app.post('/api/data', (req, res) => {
         return res.status(400).json({ error: 'Missing flow data' });
     }
 
-    // Calcul de la perte brute en L/min
-    let loss = +(flow_up - flow_down).toFixed(2);
-    if (loss < 0) loss = 0; // Sécurité : pas de fuite négative
+    const now = Date.now();
+    let durationSeconds = 1;
+    if (lastDataTime) {
+        durationSeconds = (now - lastDataTime) / 1000;
+    }
+    lastDataTime = now;
 
-    // Détermination du statut (basé sur le débit en L/min)
-    // HAUTE SENSIBILITÉ : 0.5 L/min = Majeure, 0.1 L/min = Légère
-    const status = loss > 0.5 ? 'critical' : (loss > 0.1 ? 'warning' : 'normal');
+    // 1. Calcul de l'écart en ml/min
+    let loss_ml_min = (flow_up - flow_down) * 1000;
+    if (loss_ml_min < 0) loss_ml_min = 0;
 
-    // Calcul du volume perdu EN CETTE SECONDE (ml)
-    // Formule: (L/min * 1000) / 60 seconds
-    const lossPerSecond = status === 'normal' ? 0 : (loss * 1000) / 60;
+    // 2. Logique de Filtrage (Gestion du biais de précision)
+    let status = 'normal';
+    if (loss_ml_min <= 300) {
+        loss_ml_min = 0;
+        status = 'normal';
+        ongoingLeakVolume = 0;
+    } else if (loss_ml_min <= 800) {
+        status = 'warning';
+    } else {
+        status = 'critical';
+    }
+
+    // 3. Calcul du Volume Cumulé (Intégration temporelle)
+    if (status !== 'normal') {
+        ongoingLeakVolume += (loss_ml_min * durationSeconds) / 60;
+    }
 
     const newData = {
         timestamp: new Date().toLocaleTimeString(),
-        flow_up: +(flow_up * 1000).toFixed(0),   // ml/min
+        flow_up: +(flow_up * 1000).toFixed(0),     // ml/min
         flow_down: +(flow_down * 1000).toFixed(0), // ml/min
-        loss: +lossPerSecond.toFixed(1),         // ml perdu en 1 seconde
+        loss: +ongoingLeakVolume.toFixed(1),       // ml (perte cumulée)
         status,
     };
 
     history.push(newData);
     if (history.length > 50) history.shift();
 
-    console.log(`Données reçues: In:${flow_up} Out:${flow_down} Loss:${newData.loss}ml`);
+    console.log(`Données reçues: In:${newData.flow_up} Out:${newData.flow_down} ml/min | Écart:${loss_ml_min.toFixed(0)} ml/min | Vol Cumulé:${newData.loss} ml | Statut:${status}`);
     res.status(200).json({ message: 'Success', data: newData });
 });
 
