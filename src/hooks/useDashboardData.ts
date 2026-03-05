@@ -6,6 +6,7 @@ export interface DashboardData {
     flow_down: number;
     loss: number;
     status: 'normal' | 'warning' | 'critical';
+    esp_ip?: string;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/history';

@@ -12,7 +12,10 @@ function App() {
   const [darkMode, setDarkMode] = useState(true)
   const { data, current } = useDashboardData()
 
-  const efficiency = current ? ((current.flow_down / current.flow_up) * 100).toFixed(1) : '100'
+  // Handle division by zero when no water is flowing (flow_up == 0) -> displays 0% instead of NaN%
+  const efficiency = current
+    ? (current.flow_up === 0 && current.flow_down === 0) ? '0.0' : ((current.flow_down / current.flow_up) * 100).toFixed(1)
+    : '100'
   const flowUpFmt = formatFlow(current?.flow_up || 0)
   const flowDownFmt = formatFlow(current?.flow_down || 0)
   const lossFmt = formatVolume(current?.loss || 0)
@@ -20,7 +23,7 @@ function App() {
   return (
     <div className={darkMode ? 'dark' : ''}>
       <div className="min-h-screen bg-slate-50 dark:bg-midnight transition-colors duration-300 p-4 md:p-8">
-        <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-10">
+        <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600 rounded-lg shadow-lg shadow-blue-500/20">
               <Droplet className="text-white w-8 h-8" />
@@ -31,16 +34,26 @@ function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <ExportButton data={data} />
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-3 rounded-full glass-card hover:bg-white/20 transition-all shadow-lg"
-            >
-              {darkMode ? <Sun className="text-amber-400 w-5 h-5" /> : <Moon className="text-slate-700 w-5 h-5" />}
-            </button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-4">
+              <ExportButton data={data} />
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-3 rounded-full glass-card hover:bg-white/20 transition-all shadow-lg"
+              >
+                {darkMode ? <Sun className="text-amber-400 w-5 h-5" /> : <Moon className="text-slate-700 w-5 h-5" />}
+              </button>
+            </div>
           </div>
         </header>
+
+        {/* ESP32 Status Bar */}
+        <div className="mb-8 flex items-center gap-2 px-4 py-3 glass-card rounded-xl">
+          <div className={`w-3 h-3 rounded-full ${current ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
+          <span className="text-sm font-medium dark:text-slate-300">
+            ESP32 Status: {current ? <span className="text-emerald-500 font-bold">Connecté (IP: {current.esp_ip || 'Local'})</span> : <span className="text-rose-500 font-bold">Déconnecté</span>}
+          </span>
+        </div>
 
         <main className="max-w-7xl mx-auto space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

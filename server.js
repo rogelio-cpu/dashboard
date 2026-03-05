@@ -36,25 +36,46 @@ app.post('/api/data', (req, res) => {
     }
     lastDataTime = now;
 
-    // 1. Calcul de l'écart en ml/min
-    let loss_ml_min = (flow_up - flow_down) * 1000;
-    if (loss_ml_min < 0) loss_ml_min = 0;
+    // Extraire l'IP de la requête (gère les proxies comme Render)
+    const esp_ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-    // 2. Logique de Filtrage (Tolérance augmentée pour éviter les fausses alertes)
-    let status = 'normal';
-    if (loss_ml_min <= 1000) { // Tolérance jusqu'à 1 L/min d'écart (précision des capteurs)
-        loss_ml_min = 0;
-        status = 'normal';
-        ongoingLeakVolume = 0;
-    } else if (loss_ml_min <= 2000) {
-        status = 'warning';
-    } else {
-        status = 'critical';
-    }
+    // 1. Compensation du biais matériel (Le capteur amont donne ~4.5% de plus que la sortie d'après les relevés)
+    const COMPENSATION_FACTOR = 1.045;
+    let adjusted_flow_down = flow_down * COMPENSATION_FACTOR;
+
+    // 2. Calcul de l'écart (Différence) en ml/min
+    // On OMET l'interdiction d'être négatif, car un écart négatif (à l'arrêt) 
+    // permet d'annuler la "fausse" perte accumulée lors de l'allumage avec le décalage de 50cm !
+    let loss_ml_min = (flow_up - adjusted_flow_down) * 1000;
 
     // 3. Calcul du Volume Cumulé (Intégration temporelle)
-    if (status !== 'normal') {
-        ongoingLeakVolume += (loss_ml_min * durationSeconds) / 60;
+    // On ajoute cette perte (ou on la soustrait si négative) au volume continu
+    ongoingLeakVolume += (loss_ml_min * durationSeconds) / 60;
+
+    // On ne permet pas au volume de fuite de devenir négatif (pas de "création" magique d'eau)
+    if (ongoingLeakVolume < 0) {
+        ongoingLeakVolume = 0;
+    }
+
+    // 4. Auto-nettoyage (Purger les micro-erreurs d'arrondi quand il n'y a plus de flux)
+    if (flow_up === 0 && flow_down === 0 && ongoingLeakVolume > 0 && ongoingLeakVolume < 1000) {
+        ongoingLeakVolume -= 50;
+        if (ongoingLeakVolume < 0) ongoingLeakVolume = 0;
+    }
+
+    // 5. Logique de Filtrage des Statuts
+    let status = 'normal';
+
+    // Le statut dépend maintenant d'une approche hybride : le débit ET le volume
+    if (ongoingLeakVolume < 500 && Math.abs(loss_ml_min) <= 1000) {
+        // En dessous de 500ml et avec peu d'écart instantané, c'est du bruit système
+        status = 'normal';
+    } else if (loss_ml_min > 2000 || ongoingLeakVolume > 1500) {
+        // Fuite forte (débit élevé persistant) OU accumulation importante 
+        status = 'critical';
+    } else if (loss_ml_min > 800 || ongoingLeakVolume > 500) {
+        // Zone intermédiaire (Avertissement)
+        status = 'warning';
     }
 
     const newData = {
@@ -63,6 +84,7 @@ app.post('/api/data', (req, res) => {
         flow_down: +(flow_down * 1000).toFixed(0), // ml/min
         loss: +ongoingLeakVolume.toFixed(1),       // ml (perte cumulée)
         status,
+        esp_ip: esp_ip
     };
 
     history.push(newData);
