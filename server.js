@@ -93,18 +93,6 @@ app.get('/api/history', (req, res) => {
     res.json(data);
 });
 
-// 3. API pour l'Historique complet
-app.get('/api/history/all', (req, res) => {
-    const data = history.map(row => {
-        const dateObj = new Date(row.timestamp);
-        return {
-            ...row,
-            timestamp: dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString()
-        };
-    });
-    res.json(data);
-});
-
 app.use(express.static(path.join(__dirname, 'dist')));
 
 app.get(/^(?!\/api).+/, (req, res) => {

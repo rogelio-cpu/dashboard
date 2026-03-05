@@ -7,7 +7,6 @@ import { RealTimeChart, LossChart } from './components/Charts'
 import { ExportButton } from './components/ExportButton'
 import { formatFlow, formatVolume } from './utils/formatters'
 import { HistoryTable } from './components/HistoryTable'
-import { HistoryPage } from './pages/HistoryPage'
 import { AboutPage } from './pages/AboutPage'
 
 function Home() {
@@ -74,9 +73,6 @@ function NavLinks() {
       <Link to="/" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/')}`}>
         Temps Réel
       </Link>
-      <Link to="/historique" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/historique')}`}>
-        Historique BDD
-      </Link>
       <Link to="/about" className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${isActive('/about')}`}>
         À Propos
       </Link>
@@ -121,7 +117,6 @@ function App() {
 
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/historique" element={<HistoryPage />} />
             <Route path="/about" element={<AboutPage />} />
           </Routes>
 
