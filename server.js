@@ -164,10 +164,6 @@ app.get('/api/history/all', (req, res) => {
     });
 });
 
-res.json(formattedRows);
-    });
-});
-
 // 3. Servir les fichiers statiques du build de Vite
 app.use(express.static(path.join(__dirname, 'dist')));
 
