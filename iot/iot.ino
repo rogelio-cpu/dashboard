@@ -98,6 +98,8 @@ void sendToServer(float flowUp, float flowDown, bool leak) {
     doc["api_key"] = apiKey;
     doc["flow_up"] = flowUp;
     doc["flow_down"] = flowDown;
+    doc["esp_ip"] = WiFi.localIP().toString();
+    doc["uptime"] = millis() / 1000;
     
     String jsonString;
     serializeJson(doc, jsonString);

@@ -4,16 +4,19 @@ import { formatVolume } from '../utils/formatters';
 
 interface HistoryTableProps {
     data: DashboardData[];
+    forceShowAll?: boolean;
 }
 
-export const HistoryTable = ({ data }: HistoryTableProps) => {
-    // Take last 10 records and reverse them to show newest first
-    const history = [...data].reverse().slice(0, 10);
+export const HistoryTable = ({ data, forceShowAll = false }: HistoryTableProps) => {
+    // Take last 10 records and reverse them to show newest first unless forceShowAll is true
+    const history = forceShowAll ? data : [...data].reverse().slice(0, 10);
 
     return (
         <Card className="p-0 overflow-hidden">
-            <div className="p-6 border-b border-white/10">
-                <h3 className="text-xl font-bold dark:text-white">Historique des Relevés (10 derniers)</h3>
+            <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                <h3 className="text-xl font-bold dark:text-white">
+                    {forceShowAll ? 'Tous les relevés' : 'Historique des Relevés (10 derniers)'}
+                </h3>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">

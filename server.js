@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import sqlite3 from 'sqlite3';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,8 +13,25 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Stockage temporaire (In-memory)
-let history = [];
+// Initialiser la base de données SQLite
+const dbPath = path.join(__dirname, 'database.sqlite');
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Erreur ouverture BDD SQLite:', err.message);
+    } else {
+        console.log('Connecté à la base de données SQLite.');
+        db.run(`CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            flow_up REAL NOT NULL,
+            flow_down REAL NOT NULL,
+            loss REAL NOT NULL,
+            status TEXT NOT NULL,
+            esp_ip TEXT
+        )`);
+    }
+});
+
 let ongoingLeakVolume = 0;
 let lastDataTime = null;
 
@@ -79,7 +97,7 @@ app.post('/api/data', (req, res) => {
     }
 
     const newData = {
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: new Date().toISOString(), // Use ISO string for DB sorting/filtering 
         flow_up: +(flow_up * 1000).toFixed(0),     // ml/min
         flow_down: +(flow_down * 1000).toFixed(0), // ml/min
         loss: +ongoingLeakVolume.toFixed(1),       // ml (perte cumulée)
@@ -87,16 +105,67 @@ app.post('/api/data', (req, res) => {
         esp_ip: esp_ip
     };
 
-    history.push(newData);
-    if (history.length > 50) history.shift();
+    // Insérer dans la base de données
+    const query = `INSERT INTO history (timestamp, flow_up, flow_down, loss, status, esp_ip) VALUES (?, ?, ?, ?, ?, ?)`;
+    db.run(query, [newData.timestamp, newData.flow_up, newData.flow_down, newData.loss, newData.status, newData.esp_ip], function (err) {
+        if (err) {
+            console.error('Erreur insertion BDD:', err.message);
+        }
+    });
 
-    console.log(`Données reçues: In:${newData.flow_up} Out:${newData.flow_down} ml/min | Écart:${loss_ml_min.toFixed(0)} ml/min | Vol Cumulé:${newData.loss} ml | Statut:${status}`);
-    res.status(200).json({ message: 'Success', data: newData });
+    console.log(`Données reçues: In:${newData.flow_up} Out:${newData.flow_down} ml/min | Écart:${loss_ml_min.toFixed(0)} ml/min | Vol Cumulé:${newData.loss} ml | Statut:${status} | IP:${esp_ip}`);
+
+    // Return friendly timestamp to the UI for real-time update
+    const uiData = { ...newData, timestamp: new Date().toLocaleTimeString() };
+    res.status(200).json({ message: 'Success', data: uiData });
 });
 
-// 2. API pour le Dashboard
+// 2. API pour le Dashboard (Aperçu temps réel)
 app.get('/api/history', (req, res) => {
-    res.json(history);
+    // Rend simplement les 50 dernières entrées pour le dashboard direct
+    const query = `SELECT * FROM history ORDER BY timestamp DESC LIMIT 50`;
+
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            console.error('Erreur lecture BDD:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        const formattedRows = rows.reverse().map(row => ({
+            ...row,
+            timestamp: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        }));
+
+        res.json(formattedRows);
+    });
+});
+
+// 3. API pour la page Historique complet
+app.get('/api/history/all', (req, res) => {
+    // Rend jusqu'à 1000 entrées pour la page d'historique tableur
+    const query = `SELECT * FROM history ORDER BY timestamp DESC LIMIT 1000`;
+
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            console.error('Erreur lecture BDD Historique complet:', err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        // La page historique voudra voir des dates complètes
+        const formattedRows = rows.map(row => {
+            const dateObj = new Date(row.timestamp);
+            return {
+                ...row,
+                timestamp: dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString()
+            };
+        });
+
+        res.json(formattedRows);
+    });
+});
+
+res.json(formattedRows);
+    });
 });
 
 // 3. Servir les fichiers statiques du build de Vite

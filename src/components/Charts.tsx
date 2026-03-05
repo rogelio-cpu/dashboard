@@ -1,7 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Card } from './UI';
 import type { DashboardData } from '../hooks/useDashboardData';
-import { useState } from 'react';
 import { formatFlow, formatVolume } from '../utils/formatters';
 
 interface ChartProps {
@@ -9,26 +8,10 @@ interface ChartProps {
 }
 
 export const RealTimeChart = ({ data }: ChartProps) => {
-    const [period, setPeriod] = useState<'jour' | 'mois' | 'an'>('jour');
-
     return (
         <Card className="h-[450px]">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <h3 className="text-xl font-bold dark:text-white tracking-tight">Analyse des Flux</h3>
-                <div className="flex bg-slate-200 dark:bg-white/5 p-1 rounded-lg">
-                    {(['jour', 'mois', 'an'] as const).map((p) => (
-                        <button
-                            key={p}
-                            onClick={() => setPeriod(p)}
-                            className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${period === p
-                                ? 'bg-blue-600 text-white shadow-md'
-                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                                }`}
-                        >
-                            {p.toUpperCase()}
-                        </button>
-                    ))}
-                </div>
             </div>
 
             <div className="h-[320px] w-full">
