@@ -2,13 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import pg from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-// Fallback manuel pour le développement local car dotenv échoue parfois sur Windows
-const databaseUrl = process.env.DATABASE_URL || "postgresql://postgres:iot1234AZERT@db.bvnffyibhiknsdcgixnc.supabase.co:5432/postgres";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,38 +15,8 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Initialiser la base de données PostgreSQL
-const { Pool } = pg;
-const pool = new Pool({
-    connectionString: databaseUrl,
-    ssl: { rejectUnauthorized: false },
-    // Force IPv4 pour éviter les erreurs ENETUNREACH sur certains réseaux (priorité IPv6 de Node.js)
-    family: 4
-});
-
-pool.connect((err, client, release) => {
-    if (err) {
-        console.error('Erreur de connexion détaillée PostgreSQL:', err);
-        return;
-    }
-    console.log('Connecté à la base de données PostgreSQL (Supabase/Neon).');
-
-    // Créer la table si elle n'existe pas
-    client.query(`CREATE TABLE IF NOT EXISTS history (
-        id SERIAL PRIMARY KEY,
-        timestamp TIMESTAMP NOT NULL,
-        flow_up REAL NOT NULL,
-        flow_down REAL NOT NULL,
-        loss REAL NOT NULL,
-        status VARCHAR(50) NOT NULL,
-        esp_ip VARCHAR(50)
-    )`, (err) => {
-        release();
-        if (err) {
-            console.error('Erreur création table:', err.message);
-        }
-    });
-});
+// In-memory storage (Remplace la base de données pour éviter les erreurs de connexion)
+let history = [];
 
 let ongoingLeakVolume = 0;
 let lastDataTime = null;
@@ -74,125 +40,77 @@ app.post('/api/data', (req, res) => {
     }
     lastDataTime = now;
 
-    // Extraire l'IP de la requête (gère les proxies comme Render)
     const esp_ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-    // 1. Compensation du biais matériel (Le capteur amont donne ~4.5% de plus que la sortie d'après les relevés)
     const COMPENSATION_FACTOR = 1.045;
     let adjusted_flow_down = flow_down * COMPENSATION_FACTOR;
-
-    // 2. Calcul de l'écart (Différence) en ml/min
-    // On OMET l'interdiction d'être négatif, car un écart négatif (à l'arrêt) 
-    // permet d'annuler la "fausse" perte accumulée lors de l'allumage avec le décalage de 50cm !
     let loss_ml_min = (flow_up - adjusted_flow_down) * 1000;
 
-    // 3. Calcul du Volume Cumulé (Intégration temporelle)
-    // On ajoute cette perte (ou on la soustrait si négative) au volume continu
     ongoingLeakVolume += (loss_ml_min * durationSeconds) / 60;
+    if (ongoingLeakVolume < 0) ongoingLeakVolume = 0;
 
-    // On ne permet pas au volume de fuite de devenir négatif (pas de "création" magique d'eau)
-    if (ongoingLeakVolume < 0) {
-        ongoingLeakVolume = 0;
-    }
-
-    // 4. Auto-nettoyage (Purger les micro-erreurs d'arrondi quand il n'y a plus de flux)
     if (flow_up === 0 && flow_down === 0 && ongoingLeakVolume > 0 && ongoingLeakVolume < 1000) {
         ongoingLeakVolume -= 50;
         if (ongoingLeakVolume < 0) ongoingLeakVolume = 0;
     }
 
-    // 5. Logique de Filtrage des Statuts
     let status = 'normal';
-
-    // Le statut dépend maintenant d'une approche hybride : le débit ET le volume
     if (ongoingLeakVolume < 500 && Math.abs(loss_ml_min) <= 1000) {
-        // En dessous de 500ml et avec peu d'écart instantané, c'est du bruit système
         status = 'normal';
     } else if (loss_ml_min > 2000 || ongoingLeakVolume > 1500) {
-        // Fuite forte (débit élevé persistant) OU accumulation importante 
         status = 'critical';
     } else if (loss_ml_min > 800 || ongoingLeakVolume > 500) {
-        // Zone intermédiaire (Avertissement)
         status = 'warning';
     }
 
     const newData = {
-        timestamp: new Date().toISOString(), // Use ISO string for DB sorting/filtering 
-        flow_up: +(flow_up * 1000).toFixed(0),     // ml/min
-        flow_down: +(flow_down * 1000).toFixed(0), // ml/min
-        loss: +ongoingLeakVolume.toFixed(1),       // ml (perte cumulée)
+        id: history.length + 1,
+        timestamp: new Date().toISOString(),
+        flow_up: +(flow_up * 1000).toFixed(0),
+        flow_down: +(flow_down * 1000).toFixed(0),
+        loss: +ongoingLeakVolume.toFixed(1),
         status,
         esp_ip: esp_ip
     };
 
-    // Insérer dans la base de données PostgreSQL
-    const query = `INSERT INTO history (timestamp, flow_up, flow_down, loss, status, esp_ip) VALUES ($1, $2, $3, $4, $5, $6)`;
-    pool.query(query, [newData.timestamp, newData.flow_up, newData.flow_down, newData.loss, newData.status, newData.esp_ip], (err) => {
-        if (err) {
-            console.error('Erreur insertion PostgreSQL:', err.message);
-        }
-    });
+    // Ajouter à l'historique en mémoire (limité aux 1000 derniers)
+    history.unshift(newData);
+    if (history.length > 1000) history.pop();
 
     console.log(`Données reçues: In:${newData.flow_up} Out:${newData.flow_down} ml/min | Écart:${loss_ml_min.toFixed(0)} ml/min | Vol Cumulé:${newData.loss} ml | Statut:${status} | IP:${esp_ip}`);
 
-    // Return friendly timestamp to the UI for real-time update
     const uiData = { ...newData, timestamp: new Date().toLocaleTimeString() };
     res.status(200).json({ message: 'Success', data: uiData });
 });
 
-// 2. API pour le Dashboard (Aperçu temps réel)
+// 2. API pour le Dashboard (Aperçu)
 app.get('/api/history', (req, res) => {
-    // Rend simplement les 50 dernières entrées pour le dashboard direct
-    const query = `SELECT * FROM history ORDER BY timestamp DESC LIMIT 50`;
-
-    pool.query(query, [], (err, result) => {
-        if (err) {
-            console.error('Erreur lecture PostgreSQL:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
-
-        const formattedRows = result.rows.reverse().map(row => ({
-            ...row,
-            timestamp: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        }));
-
-        res.json(formattedRows);
-    });
+    // 50 dernières entrées pour le dashboard, triées du plus ancien au plus récent pour les graphiques
+    const data = history.slice(0, 50).reverse().map(row => ({
+        ...row,
+        timestamp: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    }));
+    res.json(data);
 });
 
-// 3. API pour la page Historique complet
+// 3. API pour l'Historique complet
 app.get('/api/history/all', (req, res) => {
-    // Rend jusqu'à 1000 entrées pour la page d'historique tableur
-    const query = `SELECT * FROM history ORDER BY timestamp DESC LIMIT 1000`;
-
-    pool.query(query, [], (err, result) => {
-        if (err) {
-            console.error('Erreur lecture PostgreSQL Historique complet:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
-
-        // La page historique voudra voir des dates complètes
-        const formattedRows = result.rows.map(row => {
-            const dateObj = new Date(row.timestamp);
-            return {
-                ...row,
-                timestamp: dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString()
-            };
-        });
-
-        res.json(formattedRows);
+    const data = history.map(row => {
+        const dateObj = new Date(row.timestamp);
+        return {
+            ...row,
+            timestamp: dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString()
+        };
     });
+    res.json(data);
 });
 
-// 3. Servir les fichiers statiques du build de Vite
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// 4. Redirection vers index.html pour le routage SPA
-// UTILISATION D'UNE REGEX PURE (SANS GUILLEMETS) POUR ÉVITER LES ERREURS DE SYNTAXE
 app.get(/^(?!\/api).+/, (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(port, () => {
-    console.log(`AquaGuard Server running on port ${port}`);
+    console.log(`AquaGuard Server running (in-memory mode) on port ${port}`);
 });
