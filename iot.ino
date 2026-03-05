@@ -29,7 +29,7 @@ const int daylightOffset_sec = 0;
 volatile long pulsesUp = 0;
 volatile long pulsesDown = 0;
 const float calibrationFactor = 450.0;  // Facteur de calibration YF-S201
-const float LEAK_THRESHOLD = 0.5;       // Seuil de détection sensible (L/min)
+const float LEAK_THRESHOLD = 1.0;       // Seuil de détection moins sensible (1.0 L/min)
 
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 1000;  // Envoi toutes les 1 seconde pour "temps réel"

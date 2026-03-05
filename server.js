@@ -40,13 +40,13 @@ app.post('/api/data', (req, res) => {
     let loss_ml_min = (flow_up - flow_down) * 1000;
     if (loss_ml_min < 0) loss_ml_min = 0;
 
-    // 2. Logique de Filtrage (Gestion du biais de précision)
+    // 2. Logique de Filtrage (Tolérance augmentée pour éviter les fausses alertes)
     let status = 'normal';
-    if (loss_ml_min <= 300) {
+    if (loss_ml_min <= 1000) { // Tolérance jusqu'à 1 L/min d'écart (précision des capteurs)
         loss_ml_min = 0;
         status = 'normal';
         ongoingLeakVolume = 0;
-    } else if (loss_ml_min <= 800) {
+    } else if (loss_ml_min <= 2000) {
         status = 'warning';
     } else {
         status = 'critical';
