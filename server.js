@@ -7,6 +7,9 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Fallback manuel pour le développement local car dotenv échoue parfois sur Windows
+const databaseUrl = process.env.DATABASE_URL || "postgresql://postgres:iot1234AZERT@db.bvnffyibhiknsdcgixnc.supabase.co:5432/postgres";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -19,8 +22,10 @@ app.use(express.json());
 // Initialiser la base de données PostgreSQL
 const { Pool } = pg;
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
+    connectionString: databaseUrl,
+    ssl: { rejectUnauthorized: false },
+    // Force IPv4 pour éviter les erreurs ENETUNREACH sur certains réseaux (priorité IPv6 de Node.js)
+    family: 4
 });
 
 pool.connect((err, client, release) => {
