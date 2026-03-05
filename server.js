@@ -2,7 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import sqlite3 from 'sqlite3';
+import pg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,23 +16,35 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Initialiser la base de données SQLite
-const dbPath = path.join(__dirname, 'database.sqlite');
-const db = new sqlite3.Database(dbPath, (err) => {
+// Initialiser la base de données PostgreSQL
+const { Pool } = pg;
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+});
+
+pool.connect((err, client, release) => {
     if (err) {
-        console.error('Erreur ouverture BDD SQLite:', err.message);
-    } else {
-        console.log('Connecté à la base de données SQLite.');
-        db.run(`CREATE TABLE IF NOT EXISTS history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            flow_up REAL NOT NULL,
-            flow_down REAL NOT NULL,
-            loss REAL NOT NULL,
-            status TEXT NOT NULL,
-            esp_ip TEXT
-        )`);
+        console.error('Erreur de connexion détaillée PostgreSQL:', err);
+        return;
     }
+    console.log('Connecté à la base de données PostgreSQL (Supabase/Neon).');
+
+    // Créer la table si elle n'existe pas
+    client.query(`CREATE TABLE IF NOT EXISTS history (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMP NOT NULL,
+        flow_up REAL NOT NULL,
+        flow_down REAL NOT NULL,
+        loss REAL NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        esp_ip VARCHAR(50)
+    )`, (err) => {
+        release();
+        if (err) {
+            console.error('Erreur création table:', err.message);
+        }
+    });
 });
 
 let ongoingLeakVolume = 0;
@@ -105,11 +120,11 @@ app.post('/api/data', (req, res) => {
         esp_ip: esp_ip
     };
 
-    // Insérer dans la base de données
-    const query = `INSERT INTO history (timestamp, flow_up, flow_down, loss, status, esp_ip) VALUES (?, ?, ?, ?, ?, ?)`;
-    db.run(query, [newData.timestamp, newData.flow_up, newData.flow_down, newData.loss, newData.status, newData.esp_ip], function (err) {
+    // Insérer dans la base de données PostgreSQL
+    const query = `INSERT INTO history (timestamp, flow_up, flow_down, loss, status, esp_ip) VALUES ($1, $2, $3, $4, $5, $6)`;
+    pool.query(query, [newData.timestamp, newData.flow_up, newData.flow_down, newData.loss, newData.status, newData.esp_ip], (err) => {
         if (err) {
-            console.error('Erreur insertion BDD:', err.message);
+            console.error('Erreur insertion PostgreSQL:', err.message);
         }
     });
 
@@ -125,13 +140,13 @@ app.get('/api/history', (req, res) => {
     // Rend simplement les 50 dernières entrées pour le dashboard direct
     const query = `SELECT * FROM history ORDER BY timestamp DESC LIMIT 50`;
 
-    db.all(query, [], (err, rows) => {
+    pool.query(query, [], (err, result) => {
         if (err) {
-            console.error('Erreur lecture BDD:', err);
+            console.error('Erreur lecture PostgreSQL:', err);
             return res.status(500).json({ error: 'Database error' });
         }
 
-        const formattedRows = rows.reverse().map(row => ({
+        const formattedRows = result.rows.reverse().map(row => ({
             ...row,
             timestamp: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         }));
@@ -145,14 +160,14 @@ app.get('/api/history/all', (req, res) => {
     // Rend jusqu'à 1000 entrées pour la page d'historique tableur
     const query = `SELECT * FROM history ORDER BY timestamp DESC LIMIT 1000`;
 
-    db.all(query, [], (err, rows) => {
+    pool.query(query, [], (err, result) => {
         if (err) {
-            console.error('Erreur lecture BDD Historique complet:', err);
+            console.error('Erreur lecture PostgreSQL Historique complet:', err);
             return res.status(500).json({ error: 'Database error' });
         }
 
         // La page historique voudra voir des dates complètes
-        const formattedRows = rows.map(row => {
+        const formattedRows = result.rows.map(row => {
             const dateObj = new Date(row.timestamp);
             return {
                 ...row,
