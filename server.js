@@ -54,37 +54,34 @@ app.post('/api/data', (req, res) => {
         if (ongoingLeakVolume < 0) ongoingLeakVolume = 0;
     }
 
-    // 5. Logique de Filtrage des Statuts (Plus réactive)
-    let status = 'normal';
-    // Seuil de reset automatique (15 relevés successifs à ~2s = 30s)
-    const RESET_THRESHOLD = 15;
-    if (!global.balancedCount) global.balancedCount = 0;
+    // 5. Détection de Stabilité pour Reset Automatique
+    // On considère le système "stable" si les flux sont nuls ou équilibrés, 
+    // INDÉPENDAMMENT du volume déjà accumulé.
+    const isBalanced = (flow_up === 0 && flow_down === 0) || (Math.abs(loss_ml_min) < 100);
 
-    // Déterminer le statut basé principalement sur le flux INSTANTANÉ
-    if (loss_ml_min > 2000) {
-        status = 'critical'; // Fuite massive immédiate
-        global.balancedCount = 0;
-    } else if (loss_ml_min > 800) {
-        status = 'warning';  // Fuite modérée
-        global.balancedCount = 0;
-    } else if (ongoingLeakVolume > 1500) {
-        // Si le flux est équilibré mais qu'on a déjà perdu beaucoup, 
-        // on reste en warning au lieu de critique
-        status = 'warning';
-        global.balancedCount = 0;
-    } else if (ongoingLeakVolume > 500) {
-        status = 'warning';
-        global.balancedCount = 0;
-    } else {
-        status = 'normal';
+    if (isBalanced) {
         global.balancedCount++;
+    } else {
+        global.balancedCount = 0;
     }
 
-    // Auto-Reset si stable pendant 30s
-    if (global.balancedCount >= RESET_THRESHOLD && ongoingLeakVolume > 0) {
+    // Auto-Reset si stable pendant ~30s (15 cycles de 2s)
+    if (global.balancedCount >= 15 && ongoingLeakVolume > 0) {
         console.log('Réinitialisation automatique du volume (stabilité détectée).');
         ongoingLeakVolume = 0;
         global.balancedCount = 0;
+    }
+
+    // 6. Logique de Rendu du Statut (Visuel uniquement)
+    let status = 'normal';
+    if (loss_ml_min > 2000) {
+        status = 'critical';
+    } else if (loss_ml_min > 800) {
+        status = 'warning';
+    } else if (ongoingLeakVolume > 500) {
+        status = 'warning'; // Avertit qu'une fuite a eu lieu
+    } else {
+        status = 'normal';
     }
 
     const newData = {
