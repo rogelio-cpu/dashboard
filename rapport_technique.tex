@@ -10,7 +10,6 @@
 \usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{titling}
-\usepackage{lipsum} % Pour le texte factice, à retirer ensuite
 
 % Définition des couleurs
 \definecolor{bleuprincipal}{RGB}{0, 102, 204}
@@ -114,6 +113,18 @@ Le calcul du débit s'effectue par interruption (comptage d'impulsions). La form
 \end{equation}
 Où $K = 450.0$ est la constante d'étalonnage. Les débits amont ($Q_{\text{in}}$) et aval ($Q_{\text{out}}$) sont mesurés chaque seconde et transmis au serveur via une requête HTTP POST sécurisée sur réseau Wi-Fi.
 
+\section{Améliorations Systèmes et Serveur}
+
+\subsection{Performance et Fiabilité}
+Plusieurs optimisations critiques ont été réalisées sur le serveur Node.js pour garantir une disponibilité maximale et une simplicité d'installation :
+\begin{itemize}
+    \item \textbf{Mode In-Memory (Haute Disponibilité) :} Le système a été affranchi de toute dépendance à une base de données externe. Le serveur stocke les 1000 derniers relevés directement en mémoire vive, garantissant un affichage instantané et une absence totale de latence liée au réseau.
+    \item \textbf{Stabilité du Flux :} Optimisation du traitement des données pour éviter les blocages lors de la réception de trames successives.
+\end{itemize}
+
+\subsection{Réinitialisation Automatique (Auto-Reset)}
+Le système intègre désormais un \textit{algorithme de détection de stabilité}. Si les flux sont équilibrés ($ |Q_{\text{in}} - Q_{\text{out}}| < 100 \text{ ml/min}$) pendant 15 cycles consécutifs (soit environ 30 secondes), le volume de perte cumulé est automatiquement remis à zéro.
+
 \section{Logique de Traitement et Filtrage (Backend)}
 Afin de pallier l'imprécision inhérente aux capteurs (bruit de mesure) et statuer avec certitude sur la nature d'une fuite, le serveur applique un algorithme de traitement en plusieurs étapes.
 
@@ -158,10 +169,46 @@ $> 800$ & Fuite critique & Alerte immédiate \\
 \end{tabular}
 \end{table}
 
+\section{Logique de Décision et Métrologie}
+
+\subsection{Calcul de l'Efficacité Hydraulique}
+L'efficacité du réseau est calculée comme le ratio entre l'eau réellement livrée à l'utilisateur et l'eau entrée dans le système :
+\begin{equation}
+\boxed{\text{Efficacité (\%)} = \frac{Q_{\text{out}}}{Q_{\text{in}}} \times 100}
+\end{equation}
+Une efficacité inférieure à 90\% déclenche un passage en statut \textit{Warning}.
+
+\subsection{Étalonnage et Compensation}
+Afin de corriger le biais matériel lié à la distance entre les capteurs, un facteur de compensation est appliqué en backend :
+\begin{equation}
+Q_{\text{out (ajusté)}} = Q_{\text{out}} \times 1.045
+\end{equation}
+
+\subsection{Détection du Statut}
+Le statut du système est une variable dynamique calculée à chaque réception de donnée :
+\begin{itemize}
+    \item \textbf{\textcolor{vertaccent}{Normal :}} Flux équilibrés et aucune fuite active détectée.
+    \item \textbf{\textcolor{bleufonce}{Warning :}} Soit un écart instantané modéré ($> 800 \text{ ml/min}$), soit un volume total perdu dépassant $500 \text{ ml}$.
+    \item \textbf{\textcolor{bleuprincipal}{Critique :}} Un écart instantané majeur dépassant \textbf{2000 ml/min}.
+\end{itemize}
+
 \section{Interface et Restitution (Frontend)}
 Le Dashboard récupère l'historique traité par le serveur de façon cyclique. Les volumes et les débits sont affichés sous format numérique, vectoriel (graphiques \textsf{Recharts}) et tabulaire avec application automatique d'un formatage d'unités (bascule automatique en Litres si la valeur excède $1000 \text{ ml}$).
 
+\section{Résumé du Fonctionnement (Mode Narratif)}
+\textit{Voici comment le serveur AquaGuard opère, expliqué simplement :}
+
+\textbf{Étape 1 : Le point d'entrée} \\ Tout commence quand la petite carte Arduino (l'ESP32) envoie une lettre au serveur. Dans cette lettre, elle donne un mot de passe secret et précise exactement combien d'eau entre et sort du système.
+
+\textbf{Étape 2 : La vérification (Étape A)} \\ Le serveur vérifie le mot de passe. Si c'est le bon, il autorise le traitement ; sinon, il rejette la demande pour protéger le système.
+
+\textbf{Étape 3 : Le calcul et la compensation (Étape B)} \\ Le serveur ajuste les chiffres (grâce au facteur 1.045) pour compenser les erreurs des capteurs. Il calcule ensuite la différence et met à jour le montant des "gouttes perdues".
+
+\textbf{Étape 4 : Le stockage et le Reset (Étape C)} \\ Le serveur range ces informations dans sa mémoire. S'il remarque que l'eau est coupée ou coule normalement depuis 30 secondes, il prend une "gomme magique" et efface le volume des pertes.
+
+\textbf{Étape 5 : L'envoi du résultat} \\ Enfin, il envoie ces données au Dashboard qui dessine des graphiques pour l'utilisateur.
+
 \section{Conclusion}
-Par l'utilisation croisée du calcul d'intégration temporelle et de seuils de silence stricts, le système \textcolor{bleuprincipal}{AquaGuard} s'assure d'une haute fiabilité prédictive tout en minimisant les fausses alertes liées aux bruits de mesure conventionnels.
+Par l'utilisation croisée du calcul d'intégration temporelle, de la compensation matérielle et de l'automatisation logicielle, le système \textcolor{bleuprincipal}{AquaGuard} s'assure d'une fiabilité maximale sans intervention manuelle constante.
 
 \end{document}
