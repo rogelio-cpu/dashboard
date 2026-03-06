@@ -54,13 +54,37 @@ app.post('/api/data', (req, res) => {
         if (ongoingLeakVolume < 0) ongoingLeakVolume = 0;
     }
 
+    // 5. Logique de Filtrage des Statuts (Plus réactive)
     let status = 'normal';
-    if (ongoingLeakVolume < 500 && Math.abs(loss_ml_min) <= 1000) {
-        status = 'normal';
-    } else if (loss_ml_min > 2000 || ongoingLeakVolume > 1500) {
-        status = 'critical';
-    } else if (loss_ml_min > 800 || ongoingLeakVolume > 500) {
+    // Seuil de reset automatique (15 relevés successifs à ~2s = 30s)
+    const RESET_THRESHOLD = 15;
+    if (!global.balancedCount) global.balancedCount = 0;
+
+    // Déterminer le statut basé principalement sur le flux INSTANTANÉ
+    if (loss_ml_min > 2000) {
+        status = 'critical'; // Fuite massive immédiate
+        global.balancedCount = 0;
+    } else if (loss_ml_min > 800) {
+        status = 'warning';  // Fuite modérée
+        global.balancedCount = 0;
+    } else if (ongoingLeakVolume > 1500) {
+        // Si le flux est équilibré mais qu'on a déjà perdu beaucoup, 
+        // on reste en warning au lieu de critique
         status = 'warning';
+        global.balancedCount = 0;
+    } else if (ongoingLeakVolume > 500) {
+        status = 'warning';
+        global.balancedCount = 0;
+    } else {
+        status = 'normal';
+        global.balancedCount++;
+    }
+
+    // Auto-Reset si stable pendant 30s
+    if (global.balancedCount >= RESET_THRESHOLD && ongoingLeakVolume > 0) {
+        console.log('Réinitialisation automatique du volume (stabilité détectée).');
+        ongoingLeakVolume = 0;
+        global.balancedCount = 0;
     }
 
     const newData = {
@@ -91,6 +115,13 @@ app.get('/api/history', (req, res) => {
         timestamp: new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     }));
     res.json(data);
+});
+
+// 4. API pour réinitialiser le volume cumulé
+app.post('/api/reset', (req, res) => {
+    ongoingLeakVolume = 0;
+    console.log('Volume cumulé réinitialisé par l\'utilisateur.');
+    res.json({ message: 'Volume réinitialisé' });
 });
 
 app.use(express.static(path.join(__dirname, 'dist')));

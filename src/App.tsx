@@ -25,7 +25,7 @@ function Home() {
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${current ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
           <span className="text-sm font-medium dark:text-slate-300">
-            ESP32 Status: {current ? <span className="text-emerald-500 font-bold">Connecté (IP: {current.esp_ip || 'Local'})</span> : <span className="text-rose-500 font-bold">Déconnecté</span>}
+            ESP32 Status: {current ? <span className="text-emerald-500 font-bold">Connecté</span> : <span className="text-rose-500 font-bold">Déconnecté</span>}
           </span>
         </div>
       </div>

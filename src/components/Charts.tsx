@@ -1,4 +1,4 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from 'recharts';
 import { Card } from './UI';
 import type { DashboardData } from '../hooks/useDashboardData';
 import { formatFlow, formatVolume } from '../utils/formatters';
@@ -41,6 +41,7 @@ export const RealTimeChart = ({ data }: ChartProps) => {
                         />
                         <Area type="monotone" dataKey="flow_up" stroke="#3b82f6" fillOpacity={1} fill="url(#colorUp)" name="Entrée" />
                         <Area type="monotone" dataKey="flow_down" stroke="#10b981" fillOpacity={1} fill="url(#colorDown)" name="Sortie" />
+                        <Legend verticalAlign="top" height={36} />
                     </AreaChart>
                 </ResponsiveContainer>
             </div>

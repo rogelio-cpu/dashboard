@@ -78,5 +78,13 @@ export const useDashboardData = () => {
         return () => clearInterval(interval);
     }, []);
 
-    return { data, current };
+    const resetVolume = async () => {
+        try {
+            await fetch('/api/reset', { method: 'POST' });
+        } catch (error) {
+            console.error('Erreur lors de la réinitialisation:', error);
+        }
+    };
+
+    return { data, current, resetVolume };
 };
